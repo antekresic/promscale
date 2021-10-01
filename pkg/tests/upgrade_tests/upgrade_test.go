@@ -17,6 +17,7 @@ import (
 	"os/exec"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/blang/semver/v4"
 	"github.com/docker/go-connections/nat"
@@ -248,7 +249,7 @@ var (
 )
 
 func addNode2(t testing.TB, DBName string) {
-	db, err := pgx.Connect(context.Background(), testhelpers.PgConnectURL(DBName, testhelpers.Superuser))
+	db, err := connectWithRetry(t, context.Background(), testhelpers.PgConnectURL(DBName, testhelpers.Superuser))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -261,7 +262,7 @@ func addNode2(t testing.TB, DBName string) {
 	}
 
 	//do this as prom user
-	dbProm, err := pgx.Connect(context.Background(), testhelpers.PgConnectURL(DBName, testhelpers.NoSuperuser))
+	dbProm, err := connectWithRetry(t, context.Background(), testhelpers.PgConnectURL(DBName, testhelpers.NoSuperuser))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -428,7 +429,7 @@ func migrateToVersion(t testing.TB, connectURL string, version string, commitHas
 		t.Fatal(err)
 	}
 
-	migratePool, err := pgx.Connect(context.Background(), connectURL)
+	migratePool, err := connectWithRetry(t, context.Background(), connectURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -514,7 +515,7 @@ func TestExtensionUpgrade(t *testing.T) {
 	extVersion := "2.0.0-rc2"
 	dropAndCreateExt(t, ctx, extVersion)
 
-	db, err := pgx.Connect(ctx, testhelpers.PgConnectURL("postgres", testhelpers.Superuser))
+	db, err := connectWithRetry(t, ctx, testhelpers.PgConnectURL("postgres", testhelpers.Superuser))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -564,7 +565,7 @@ func TestExtensionUpgrade(t *testing.T) {
 		defer testhelpers.StopContainer(ctx, connector, *printLogs)
 
 		var versionStr string
-		db, err = pgx.Connect(ctx, testhelpers.PgConnectURL("postgres", testhelpers.Superuser))
+		db, err = connectWithRetry(t, ctx, testhelpers.PgConnectURL("postgres", testhelpers.Superuser))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -582,6 +583,42 @@ func TestExtensionUpgrade(t *testing.T) {
 	}()
 }
 
+type connResult struct {
+	db  *pgx.Conn
+	err error
+}
+
+// connectWithRetry is a workaround for the current pgx.Connect bug which causes
+// the test to hang. By running Connect in a goroutine, we can retry the connecting
+// after a timeout.
+// See: https://github.com/jackc/pgconn/issues/92
+func connectWithRetry(t testing.TB, ctx context.Context, connStr string) (*pgx.Conn, error) {
+	timeout := 5 * time.Second
+	numRetries := 1
+	counter := 0
+	resChan := make(chan connResult)
+	defer close(resChan)
+
+	for counter < numRetries {
+		go func() {
+			db, err := pgx.Connect(ctx, connStr)
+			select {
+			case resChan <- connResult{db, err}:
+			default:
+			}
+		}()
+
+		select {
+		case res := <-resChan:
+			return res.db, res.err
+		case <-time.After(timeout):
+			counter++
+			t.Logf("timed out getting a connection (timeout: %v), retrying", timeout)
+		}
+	}
+	return nil, fmt.Errorf("could not connect to DB after %d retries", counter)
+}
+
 func TestMigrationFailure(t *testing.T) {
 	ctx := context.Background()
 	var err error
@@ -596,7 +633,7 @@ func TestMigrationFailure(t *testing.T) {
 	extVersion := "1.7.3"
 	dropAndCreateExt(t, ctx, extVersion)
 
-	db, err = pgx.Connect(ctx, testhelpers.PgConnectURL("postgres", testhelpers.Superuser))
+	db, err = connectWithRetry(t, ctx, testhelpers.PgConnectURL("postgres", testhelpers.Superuser))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -622,7 +659,7 @@ func TestMigrationFailure(t *testing.T) {
 		}
 		defer testhelpers.StopContainer(ctx, connector, *printLogs)
 
-		db, err = pgx.Connect(ctx, testhelpers.PgConnectURL("postgres", testhelpers.Superuser))
+		db, err = connectWithRetry(t, ctx, testhelpers.PgConnectURL("postgres", testhelpers.Superuser))
 		if err != nil {
 			t.Fatal(err)
 
@@ -651,7 +688,7 @@ func TestMigrationFailure(t *testing.T) {
 		defer testhelpers.StopContainer(ctx, connector, *printLogs)
 
 		var version string
-		db, err = pgx.Connect(ctx, testhelpers.PgConnectURL("postgres", testhelpers.Superuser))
+		db, err = connectWithRetry(t, ctx, testhelpers.PgConnectURL("postgres", testhelpers.Superuser))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -703,7 +740,7 @@ func startDB(t *testing.T, ctx context.Context) (*pgx.Conn, testcontainers.Conta
 	}
 
 	// need to get a new pool after the Migrate to catch any GUC changes made during Migrate
-	db, err := pgx.Connect(ctx, testhelpers.PgConnectURL("postgres", testhelpers.Superuser))
+	db, err := connectWithRetry(t, ctx, testhelpers.PgConnectURL("postgres", testhelpers.Superuser))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -713,7 +750,7 @@ func startDB(t *testing.T, ctx context.Context) (*pgx.Conn, testcontainers.Conta
 
 func dropAndCreateExt(t *testing.T, ctx context.Context, extVersion string) {
 	// Drop existing installed extension & install a lower extension version to test upgrade
-	db, err := pgx.Connect(ctx, testhelpers.PgConnectURL("postgres", testhelpers.Superuser))
+	db, err := connectWithRetry(t, ctx, testhelpers.PgConnectURL("postgres", testhelpers.Superuser))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -724,7 +761,7 @@ func dropAndCreateExt(t *testing.T, ctx context.Context, extVersion string) {
 	}
 	db.Close(ctx)
 
-	db, err = pgx.Connect(ctx, testhelpers.PgConnectURL("postgres", testhelpers.Superuser))
+	db, err = connectWithRetry(t, ctx, testhelpers.PgConnectURL("postgres", testhelpers.Superuser))
 	if err != nil {
 		t.Fatal(err)
 	}

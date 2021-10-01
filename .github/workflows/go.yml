@@ -85,7 +85,7 @@ jobs:
 
     - name: 'Print failure logs'
       if: ${{ failure() }}
-      run: grep "^[- F]" complete-test-run.log
+      run: cat complete-test-run.log
 
     - name: 'Upload Log Artifact'
       if: ${{ always() }}
