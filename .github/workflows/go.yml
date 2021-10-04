@@ -81,11 +81,11 @@ jobs:
         fi
 
     - name: Test
-      run: go test -v -race ./... -timeout 40m > complete-test-run.log  2>&1
+      run: go test -v -race ./... -timeout 15m > complete-test-run.log  2>&1
 
     - name: 'Print failure logs'
       if: ${{ failure() }}
-      run: grep "^[- F]" complete-test-run.log
+      run: cat complete-test-run.log
 
     - name: 'Upload Log Artifact'
       if: ${{ always() }}

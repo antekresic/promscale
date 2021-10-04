@@ -28,7 +28,7 @@ import (
 
 const (
 	defaultDB       = "postgres"
-	connectTemplate = "postgres://%s:password@%s:%d/%s"
+	connectTemplate = "postgres://%s:password@%s:%d/%s?sslmode=disable"
 
 	postgresUser    = "postgres"
 	promUser        = "prom"
@@ -738,6 +738,7 @@ func StartConnectorWithImage(ctx context.Context, dbContainer testcontainers.Con
 			"-db-password", "password",
 			"-db-name", dbname,
 			"-db-ssl-mode", "prefer",
+			"-db-connections-max", "10",
 		},
 	}
 

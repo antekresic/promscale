@@ -499,12 +499,39 @@ func copyMetrics(metrics []prompb.TimeSeries) []prompb.TimeSeries {
 	return out
 }
 
+func printLogsFromContainer(t testing.TB, c testcontainers.Container) {
+
+	if r := recover(); r == nil {
+		return
+	}
+	t.Logf("test panicked")
+
+	lReader, err := c.Logs(context.Background())
+	if err != nil {
+		t.Logf("couldn't get container logs: %v", err)
+		return
+	}
+	defer lReader.Close()
+
+	var logs []byte
+
+	_, err = io.ReadFull(lReader, logs)
+	if err != nil {
+		t.Logf("couldn't read logs from reader: %v", err)
+		return
+	}
+
+	t.Logf("DB logs output: %s", string(logs))
+
+}
+
 func TestExtensionUpgrade(t *testing.T) {
 	var err error
 	var version string
 	ctx := context.Background()
 	buildPromscaleImageFromRepo(t)
 	_, dbContainer, closer := startDB(t, ctx)
+	defer printLogsFromContainer(t, dbContainer)
 	defer closer.Close()
 
 	defer testhelpers.StopContainer(ctx, dbContainer, false)
@@ -549,7 +576,10 @@ func TestExtensionUpgrade(t *testing.T) {
 		t.Logf("successfully tested extension upgrade flow with --upgrade-prereleases-extensions false")
 	}()
 
-	db.Close(ctx)
+	err = db.Close(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// start a new connector and test --upgrade-prerelease-extensions as true
 	// the default installed ext version is rc2 now it should upgrade it to rc4
@@ -573,7 +603,10 @@ func TestExtensionUpgrade(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		db.Close(ctx)
+		err = db.Close(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		if versionStr != "2.0.0-rc4" {
 			t.Fatal("failed to verify upgrade extension with -upgrade-prerelease-extension true")
@@ -588,6 +621,7 @@ func TestMigrationFailure(t *testing.T) {
 	var version string
 	buildPromscaleImageFromRepo(t)
 	db, dbContainer, closer := startDB(t, ctx)
+	defer printLogsFromContainer(t, dbContainer)
 	defer testhelpers.StopContainer(ctx, dbContainer, false)
 
 	defer closer.Close()
@@ -606,7 +640,11 @@ func TestMigrationFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	db.Close(ctx)
+	err = db.Close(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	if version != extVersion {
 		t.Fatal("failed to verify upgrade extension with -upgrade-prerelease-extension false")
 	}
@@ -632,7 +670,10 @@ func TestMigrationFailure(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		db.Close(ctx)
+		err = db.Close(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
 		if version != "1.7.3" {
 			t.Fatal("failed to verify upgrade extension with -upgrade-prerelease-extension false")
 		}
@@ -659,7 +700,10 @@ func TestMigrationFailure(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		db.Close(ctx)
+		err = db.Close(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		if version != "1.7.3" {
 			t.Fatal("failed to verify timescaleDB extension version")
@@ -722,7 +766,10 @@ func dropAndCreateExt(t *testing.T, ctx context.Context, extVersion string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	db.Close(ctx)
+	err = db.Close(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	db, err = pgx.Connect(ctx, testhelpers.PgConnectURL("postgres", testhelpers.Superuser))
 	if err != nil {
@@ -733,5 +780,8 @@ func dropAndCreateExt(t *testing.T, ctx context.Context, extVersion string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	db.Close(ctx)
+	err = db.Close(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
