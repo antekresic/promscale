@@ -57,6 +57,19 @@ func TestIngestTracesMultiTraces(t *testing.T) {
 	})
 }
 
+func TestIngestTracesFromDataset(t *testing.T) {
+	withDB(t, *testDatabase, func(db *pgxpool.Pool, t testing.TB) {
+		ingestor, err := ingstr.NewPgxIngestorForTests(pgxconn.NewPgxConn(db), nil)
+		require.NoError(t, err)
+		defer ingestor.Close()
+		traces := generateSmallTraces()
+		for i := range traces {
+			err = ingestor.IngestTraces(context.Background(), traces[i])
+			require.NoError(t, err)
+		}
+	})
+}
+
 func generateTestTrace() pdata.Traces {
 	spanCount := 4
 	td := pdata.NewTraces()

@@ -5,6 +5,8 @@
 package end_to_end_tests
 
 import (
+	"encoding/gob"
+	"io"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -14,6 +16,8 @@ import (
 	"github.com/prometheus/prometheus/pkg/timestamp"
 	"github.com/timescale/promscale/pkg/pgmodel/model"
 	"github.com/timescale/promscale/pkg/prompb"
+	"go.opentelemetry.io/collector/model/otlp"
+	"go.opentelemetry.io/collector/model/pdata"
 )
 
 const (
@@ -22,6 +26,8 @@ const (
 
 	samplesStartTime = 1597055698698
 	samplesEndTime   = 1597059548699
+
+	tracesEntryCount = 5932 // All entries in the traces-dataset.sz file.
 )
 
 var (
@@ -412,4 +418,54 @@ func generateRandomMetricMetadata(num int) []prompb.MetricMetadata {
 		data[i] = metadata
 	}
 	return data
+}
+
+func readTraces(count int) []pdata.Traces {
+	// Clamp to max.
+	if count > tracesEntryCount {
+		count = tracesEntryCount
+	}
+
+	f, err := os.Open("../testdata/traces-dataset.sz")
+	if err != nil {
+		panic(err)
+	}
+
+	defer f.Close()
+	gReader := gob.NewDecoder(snappy.NewReader(f))
+
+	var (
+		buf               []byte
+		t                 pdata.Traces
+		tracesUnmarshaler = otlp.NewProtobufTracesUnmarshaler()
+		i                 = 0
+		result            = make([]pdata.Traces, 0, count)
+	)
+
+	for i < count {
+		err = gReader.Decode(&buf)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			panic(err)
+		}
+
+		t, err = tracesUnmarshaler.UnmarshalTraces(buf)
+		if err != nil {
+			panic(err)
+		}
+
+		result = append(result, t)
+		i++
+	}
+	return result
+}
+
+func generateAllTraces() []pdata.Traces {
+	return readTraces(tracesEntryCount)
+}
+
+func generateSmallTraces() []pdata.Traces {
+	return readTraces(20)
 }
