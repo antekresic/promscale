@@ -65,6 +65,7 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-go-
 
+
     - name: Test
       run: make test > complete-test-run.log  2>&1
 
@@ -124,6 +125,11 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-go-
 
+    - name: Set up gotestfmt
+      uses: haveyoudebuggedit/gotestfmt-action@v2
+      with:
+        version: v2.0.0
+
     - name: Test ${{ matrix.test-setups.name }}
       env:
         PG: ${{ matrix.test-setups.pg }}
@@ -133,7 +139,7 @@ jobs:
         MULTI: ${{ matrix.test-setups.multi }}
         TSDBOSS: ${{ matrix.test-setups.tsdboss }}
         SHORTNAME: ${{ matrix.test-setups.shortname }}
-      run: go test -race ./pkg/tests/end_to_end_tests/ -use-extension=$EXT -use-timescaledb=$TSDB -use-timescale2=$TSDB2 -use-timescaledb-oss=$TSDBOSS -use-multinode=$MULTI -postgres-version-major=$PG | tee $SHORTNAME-test-run.log  2>&1
+      run: go test -json -race ./pkg/tests/end_to_end_tests/ -use-extension=$EXT -use-timescaledb=$TSDB -use-timescale2=$TSDB2 -use-timescaledb-oss=$TSDBOSS -use-multinode=$MULTI -postgres-version-major=$PG 2>&1 | tee $SHORTNAME-test-run.log | gotestfmt
 
     - name: 'Upload Log Artifact'
       if: ${{ always() }}
