@@ -33,10 +33,7 @@ type Config struct {
 	ConfigFile                  string
 	TLSCertFile                 string
 	TLSKeyFile                  string
-	HaGroupLockID               int64
 	ThroughputInterval          time.Duration
-	PrometheusTimeout           time.Duration
-	ElectionInterval            time.Duration
 	AsyncAcks                   bool
 	Migrate                     bool
 	StopAfterMigrate            bool
@@ -44,6 +41,58 @@ type Config struct {
 	InstallExtensions           bool
 	UpgradeExtensions           bool
 	UpgradePrereleaseExtensions bool
+	StartupOnly                 bool
+}
+
+var flagAliases = map[string][]string{
+	"auth.tls-cert-file":                {"tls-cert-file"},
+	"auth.tls-key-file":                 {"tls-key-file"},
+	"cache.memory-target":               {"memory-target"},
+	"db.app":                            {"app"},
+	"db.connection-timeout":             {"db-connection-timeout"},
+	"db.connections-max":                {"db-connections-max"},
+	"db.host":                           {"db-host"},
+	"db.name":                           {"db-name"},
+	"db.password":                       {"db-password"},
+	"db.port":                           {"db-port"},
+	"db.read-only":                      {"read-only"},
+	"db.ssl-mode":                       {"db-ssl-mode"},
+	"db.statements-cache":               {"db-statements-cache"},
+	"db.uri":                            {"db-uri"},
+	"db.user":                           {"db-user"},
+	"log.format":                        {"log-format"},
+	"log.level":                         {"log-level"},
+	"log.throughput-report-interval":    {"tput-report"},
+	"metrics.async-acks":                {"async-acks"},
+	"metrics.cache.exemplar.size":       {"labels-cache-size"},
+	"metrics.cache.labels.size":         {"exemplar-cache-size"},
+	"metrics.cache.metrics.size":        {"metrics-cache-size"},
+	"metrics.cache.series.initial-size": {"series-cache-initial-size"},
+	"metrics.cache.series.max-bytes":    {"series-cache-max-bytes"},
+	"metrics.ignore-samples-written-to-compressed-chunks": {"ignore-samples-written-to-compressed-chunks"},
+	"metrics.multi-tenancy":                               {"multi-tenancy"},
+	"metrics.multi-tenancy.allow-non-tenants":             {"multi-tenancy-allow-non-tenants"},
+	"metrics.multi-tenancy.valid-tenants":                 {"multi-tenancy-valid-tenants"},
+	"metrics.promql.default-subquery-step-interval":       {"promql-default-subquery-step-interval"},
+	"metrics.promql.lookback-delta":                       {"promql-lookback-delta"},
+	"metrics.promql.max-points-per-ts":                    {"promql-max-points-per-ts"},
+	"metrics.promql.max-samples":                          {"promql-max-samples"},
+	"metrics.promql.query-timeout":                        {"promql-query-timeout"},
+	"startup.install-extensions":                          {"install-extensions"},
+	"startup.upgrade-extensions":                          {"upgrade-extensions"},
+	"startup.upgrade-prerelease-extensions":               {"upgrade-prerelease-extensions"},
+	"startup.use-schema-version-lease":                    {"use-schema-version-lease"},
+	"thanos.store-api.server-address":                     {"thanos-store-api-listen-address"},
+	"tracing.otlp.server-address":                         {"otlp-grpc-server-listen-address"},
+	"web.cors-origin":                                     {"web-cors-origin"},
+	"web.listen-address":                                  {"web-listen-address"},
+	"web.auth.bearer-token-file":                          {"bearer-token-file"},
+	"web.auth.bearer-token":                               {"bearer-token"},
+	"web.auth.password-file":                              {"auth-password-file"},
+	"web.auth.password":                                   {"auth-password"},
+	"web.auth.username":                                   {"auth-username"},
+	"web.enable-admin-api":                                {"web-enable-admin-api"},
+	"web.telemetry-path":                                  {"web-telemetry-path"},
 }
 
 func ParseFlags(cfg *Config, args []string) (*Config, error) {
@@ -52,6 +101,7 @@ func ParseFlags(cfg *Config, args []string) (*Config, error) {
 
 		corsOriginFlag string
 		migrateOption  string
+		skipMigrate    bool
 	)
 
 	pgclient.ParseFlags(fs, &cfg.PgmodelCfg)
@@ -61,22 +111,24 @@ func ParseFlags(cfg *Config, args []string) (*Config, error) {
 	tenancy.ParseFlags(fs, &cfg.TenancyCfg)
 
 	fs.StringVar(&cfg.ConfigFile, "config", "config.yml", "YAML configuration file path for Promscale.")
-	fs.StringVar(&cfg.ListenAddr, "web-listen-address", ":9201", "Address to listen on for web endpoints.")
-	fs.StringVar(&cfg.ThanosStoreAPIListenAddr, "thanos-store-api-listen-address", "", "Address to listen on for Thanos Store API endpoints.")
-	fs.StringVar(&cfg.OTLPGRPCListenAddr, "otlp-grpc-server-listen-address", "", "Address to listen on for OTLP GRPC server.")
-	fs.StringVar(&corsOriginFlag, "web-cors-origin", ".*", `Regex for CORS origin. It is fully anchored. Example: 'https?://(domain1|domain2)\.com'`)
-	fs.Int64Var(&cfg.HaGroupLockID, "leader-election-pg-advisory-lock-id", 0, "(DEPRECATED) Leader-election based high-availability. It is based on PostgreSQL advisory lock and requires a unique advisory lock ID per high-availability group. Only a single connector in each high-availability group will write data at one time. A value of 0 disables leader election.")
-	fs.DurationVar(&cfg.ThroughputInterval, "tput-report", time.Second, "Duration interval at which throughput should be reported. Setting duration to `0` will disable reporting throughput, otherwise, an interval with unit must be provided, e.g. `10s` or `3m`.")
-	fs.DurationVar(&cfg.PrometheusTimeout, "leader-election-pg-advisory-lock-prometheus-timeout", -1, "(DEPRECATED) Prometheus timeout duration for leader-election high-availability. The connector will resign if the associated Prometheus instance does not respond within the given timeout. This value should be a low multiple of the Prometheus scrape interval, big enough to prevent random flips.")
-	fs.DurationVar(&cfg.ElectionInterval, "leader-election-scheduled-interval", 5*time.Second, "(DEPRECATED) Interval at which scheduled election runs. This is used to select a leader and confirm that we still holding the advisory lock.")
-	fs.StringVar(&migrateOption, "migrate", "true", "Update the Prometheus SQL schema to the latest version. Valid options are: [true, false, only].")
-	fs.BoolVar(&cfg.UseVersionLease, "use-schema-version-lease", true, "Use schema version lease to prevent race conditions during migration.")
-	fs.BoolVar(&cfg.InstallExtensions, "install-extensions", true, "Install TimescaleDB, Promscale extension.")
-	fs.BoolVar(&cfg.UpgradeExtensions, "upgrade-extensions", true, "Upgrades TimescaleDB, Promscale extensions.")
-	fs.BoolVar(&cfg.AsyncAcks, "async-acks", false, "Acknowledge asynchronous inserts. If this is true, the inserter will not wait after insertion of metric data in the database. This increases throughput at the cost of a small chance of data loss.")
-	fs.BoolVar(&cfg.UpgradePrereleaseExtensions, "upgrade-prerelease-extensions", false, "Upgrades to pre-release TimescaleDB, Promscale extensions.")
-	fs.StringVar(&cfg.TLSCertFile, "tls-cert-file", "", "TLS Certificate file used for server authentication, leave blank to disable TLS. NOTE: this option is used for all servers that Promscale runs (web and GRPC).")
-	fs.StringVar(&cfg.TLSKeyFile, "tls-key-file", "", "TLS Key file for server authentication, leave blank to disable TLS. NOTE: this option is used for all servers that Promscale runs (web and GRPC).")
+	fs.StringVar(&cfg.ListenAddr, "web.listen-address", ":9201", "Address to listen on for web endpoints.")
+	fs.StringVar(&cfg.ThanosStoreAPIListenAddr, "thanos.store-api.server-address", "", "Address to listen on for Thanos Store API endpoints.")
+	fs.StringVar(&cfg.OTLPGRPCListenAddr, "tracing.otlp.server-address", "", "Address to listen on for OTLP GRPC server.")
+	fs.StringVar(&corsOriginFlag, "web.cors-origin", ".*", `Regex for CORS origin. It is fully anchored. Example: 'https?://(domain1|domain2)\.com'`)
+	fs.DurationVar(&cfg.ThroughputInterval, "log.throughput-report-interval", time.Second, "Duration interval at which throughput should be reported. Setting duration to `0` will disable reporting throughput, otherwise, an interval with unit must be provided, e.g. `10s` or `3m`.")
+	fs.StringVar(&migrateOption, "migrate", "true", "Update the Prometheus SQL schema to the latest version. Valid options are: [true, false, only]. (DEPRECATED) Will be removed in version 0.8.0")
+	fs.BoolVar(&cfg.StartupOnly, "startup.only", false, "Only run startup configuration with Promscale (i.e. migrate) and exit.")
+	fs.BoolVar(&skipMigrate, "startup.skip-migrate", false, "Skip migrating Promscale SQL schema to latest version on startup.")
+
+	fs.BoolVar(&cfg.UseVersionLease, "startup.use-schema-version-lease", true, "Use schema version lease to prevent race conditions during migration.")
+	fs.BoolVar(&cfg.InstallExtensions, "startup.install-extensions", true, "Install TimescaleDB, Promscale extension.")
+	fs.BoolVar(&cfg.UpgradeExtensions, "startup.upgrade-extensions", true, "Upgrades TimescaleDB, Promscale extensions.")
+	fs.BoolVar(&cfg.AsyncAcks, "metrics.async-acks", false, "Acknowledge asynchronous inserts. If this is true, the inserter will not wait after insertion of metric data in the database. This increases throughput at the cost of a small chance of data loss.")
+	fs.BoolVar(&cfg.UpgradePrereleaseExtensions, "startup.upgrade-prerelease-extensions", false, "Upgrades to pre-release TimescaleDB, Promscale extensions.")
+	fs.StringVar(&cfg.TLSCertFile, "auth.tls-cert-file", "", "TLS Certificate file used for server authentication, leave blank to disable TLS. NOTE: this option is used for all servers that Promscale runs (web and GRPC).")
+	fs.StringVar(&cfg.TLSKeyFile, "auth.tls-key-file", "", "TLS Key file for server authentication, leave blank to disable TLS. NOTE: this option is used for all servers that Promscale runs (web and GRPC).")
+
+	util.AddAliases(fs, flagAliases, "(DEPRECATED) Will be removed in version 0.9.0")
 
 	if err := util.ParseEnv("PROMSCALE", fs); err != nil {
 		return nil, fmt.Errorf("error parsing env variables: %w", err)
@@ -109,10 +161,10 @@ func ParseFlags(cfg *Config, args []string) (*Config, error) {
 	OLTPGRPCListenerConfigured := len(cfg.OTLPGRPCListenAddr) > 0
 
 	if !tracingEnabled && OLTPGRPCListenerConfigured {
-		return nil, fmt.Errorf("feature 'tracing' must be enabled (with `-enable-feature tracing`) to configure 'otlp-grpc-server-listen-address'")
+		return nil, fmt.Errorf("feature 'tracing' must be enabled (with `-enable-feature tracing`) to configure 'tracing.otlp.server-address'")
 	}
 	if tracingEnabled && !OLTPGRPCListenerConfigured {
-		return nil, fmt.Errorf("'otlp-grpc-server-listen-address' must be configured if 'tracing' enabled")
+		return nil, fmt.Errorf("'tracing.otlp.server-address' must be configured if 'tracing' enabled")
 	}
 
 	cfg.StopAfterMigrate = false
@@ -127,14 +179,15 @@ func ParseFlags(cfg *Config, args []string) (*Config, error) {
 		return nil, fmt.Errorf("Invalid option for migrate: %v. Valid options are [true, false, only]", migrateOption)
 	}
 
+	if skipMigrate {
+		cfg.Migrate = false
+	}
+
 	if cfg.APICfg.ReadOnly {
 		flagset := make(map[string]bool)
 		fs.Visit(func(f *flag.Flag) { flagset[f.Name] = true })
 		if (flagset["migrate"] && cfg.Migrate) || (flagset["use-schema-version-lease"] && cfg.UseVersionLease) {
 			return nil, fmt.Errorf("Migration flags not supported in read-only mode")
-		}
-		if flagset["leader-election-pg-advisory-lock-id"] && cfg.HaGroupLockID != 0 {
-			return nil, fmt.Errorf("Invalid option for HA group lock ID, cannot enable HA mode and read-only mode")
 		}
 		if flagset["install-extensions"] && cfg.InstallExtensions {
 			return nil, fmt.Errorf("Cannot install or update TimescaleDB extension in read-only mode")
@@ -146,7 +199,7 @@ func ParseFlags(cfg *Config, args []string) (*Config, error) {
 		cfg.UpgradeExtensions = false
 	}
 
-	if cfg.HaGroupLockID != 0 {
+	if cfg.APICfg.HighAvailability {
 		cfg.PgmodelCfg.UsesHA = true
 	}
 	return cfg, nil
