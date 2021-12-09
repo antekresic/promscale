@@ -81,7 +81,7 @@ func runMain(m *testing.M) int {
 			fmt.Println("Error getting temp dir for Prometheus storage", err)
 			os.Exit(1)
 		}
-		err = os.Mkdir(filepath.Join(path, "wal"), 0777)
+		err = os.Mkdir(filepath.Join(path, "wal"), 0600)
 		if err != nil {
 			fmt.Println("Error getting temp dir for Prometheus storage", err)
 			os.Exit(1)

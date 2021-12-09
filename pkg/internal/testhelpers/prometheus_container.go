@@ -21,16 +21,16 @@ const prometheusImage = "prom/prometheus:main"
 // #nosec
 func StartPromContainer(storagePath string, ctx context.Context) (testcontainers.Container, string, nat.Port, error) {
 	// Set the storage directories permissions so Prometheus can write to them.
-	err := os.Chmod(storagePath, 0777)
+	err := os.Chmod(storagePath, 0600)
 	if err != nil {
 		return nil, "", "", err
 	}
-	if err := os.Chmod(filepath.Join(storagePath, "wal"), 0777); err != nil {
+	if err := os.Chmod(filepath.Join(storagePath, "wal"), 0600); err != nil {
 		return nil, "", "", err
 	}
 
 	promConfigFile := filepath.Join(storagePath, "prometheus.yml")
-	err = ioutil.WriteFile(promConfigFile, []byte(emptyPromConfig), 0777)
+	err = ioutil.WriteFile(promConfigFile, []byte(emptyPromConfig), 0600)
 	if err != nil {
 		return nil, "", "", err
 	}
