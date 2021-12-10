@@ -28,7 +28,7 @@ require (
 	github.com/jackc/pgtype v1.9.1
 	github.com/jackc/pgx/v4 v4.14.1
 	github.com/jaegertracing/jaeger v1.29.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/jaeger v0.40.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/jaeger v0.41.0
 	github.com/opentracing-contrib/go-stdlib v1.0.0
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pbnjay/memory v0.0.0-20201129165224-b12e5d931931
@@ -46,7 +46,7 @@ require (
 	github.com/testcontainers/testcontainers-go v0.10.1-0.20210318151656-2bbeb1e04514
 	github.com/thanos-io/thanos v0.20.1
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
-	go.opentelemetry.io/collector/model v0.40.0
+	go.opentelemetry.io/collector/model v0.41.0
 	go.uber.org/automaxprocs v1.4.0
 	go.uber.org/goleak v1.1.12
 	golang.org/x/sys v0.0.0-20211020174200-9d6173849985
