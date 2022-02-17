@@ -24,14 +24,14 @@ require (
 	github.com/jackc/pgproto3/v2 v2.2.0
 	github.com/jackc/pgtype v1.9.1
 	github.com/jackc/pgx/v4 v4.14.1
-	github.com/jaegertracing/jaeger v1.30.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/jaeger v0.42.0
+	github.com/jaegertracing/jaeger v1.31.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/jaeger v0.45.0
 	github.com/opentracing-contrib/go-stdlib v1.0.0
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pbnjay/memory v0.0.0-20201129165224-b12e5d931931
 	github.com/peterbourgon/ff/v3 v3.1.2
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.12.0
+	github.com/prometheus/client_golang v1.12.1
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.32.1
 	github.com/prometheus/prometheus v1.8.2-0.20220117154355-4855a0c067e2
@@ -42,16 +42,16 @@ require (
 	github.com/testcontainers/testcontainers-go v0.10.1-0.20210318151656-2bbeb1e04514
 	github.com/thanos-io/thanos v0.24.0
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
-	go.opentelemetry.io/collector/model v0.42.0
+	go.opentelemetry.io/collector/model v0.45.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.28.0
-	go.opentelemetry.io/otel v1.3.0
+	go.opentelemetry.io/otel v1.4.0
 	go.opentelemetry.io/otel/exporters/jaeger v1.3.0
-	go.opentelemetry.io/otel/sdk v1.3.0
-	go.opentelemetry.io/otel/trace v1.3.0
+	go.opentelemetry.io/otel/sdk v1.4.0
+	go.opentelemetry.io/otel/trace v1.4.0
 	go.uber.org/automaxprocs v1.4.0
 	go.uber.org/goleak v1.1.12
 	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9
-	google.golang.org/grpc v1.43.0
+	google.golang.org/grpc v1.44.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 
